@@ -63,22 +63,11 @@ export default function ReadChapterPage() {
         setStory(storyWithStringId as Story);
       }
 
-      // Fetch all chapters để navigation
-      const chaptersResponse = await fetch(`/api/stories/${storyId}/chapters`);
+      // Fetch chỉ các chương đã dịch để navigation
+      const chaptersResponse = await fetch(`/api/stories/${storyId}/chapters/translated`);
       const chaptersData = await chaptersResponse.json();
       if (chaptersData.success) {
-        const translatedChapters = chaptersData.data
-          .filter((ch: { translatedContent?: string; status: string }) => 
-            ch.translatedContent && ch.status === 'completed'
-          )
-          .map((ch: { chapterNumber: number; title: string }) => ({
-            chapterNumber: ch.chapterNumber,
-            title: ch.title,
-          }))
-          .sort((a: { chapterNumber: number }, b: { chapterNumber: number }) => 
-            a.chapterNumber - b.chapterNumber
-          );
-        setAllChapters(translatedChapters);
+        setAllChapters(chaptersData.data);
       }
     } catch (error) {
       console.error('Error fetching data:', error);

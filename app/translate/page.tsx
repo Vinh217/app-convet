@@ -27,6 +27,7 @@ export default function TranslatePage() {
   const [loading, setLoading] = useState(false);
   const [translating, setTranslating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   useEffect(() => {
     fetchStories();
@@ -87,34 +88,46 @@ export default function TranslatePage() {
     setMessage(null);
 
     try {
-      const endpoint = selectedChapters.size > 0 
-        ? '/api/translate/selected'
-        : '/api/translate/batch';
-      
-      const body = selectedChapters.size > 0
-        ? { chapterIds: Array.from(selectedChapters) }
-        : { limit: 5 };
+      const chapterIds = selectedChapters.size > 0
+        ? Array.from(selectedChapters)
+        : null;
 
-      const response = await fetch(endpoint, {
+      // Nếu không có chương được chọn, lấy 5 chương pending
+      let finalChapterIds = chapterIds;
+      if (!finalChapterIds || finalChapterIds.length === 0) {
+        const pendingChapters = chapters.filter(ch => 
+          ch.status === 'pending' && ch.originalContent && ch.originalContent.trim()
+        ).slice(0, 5);
+        finalChapterIds = pendingChapters.map(ch => ch._id);
+      }
+
+      if (!finalChapterIds || finalChapterIds.length === 0) {
+        setMessage({ type: 'error', text: 'Không có chương nào để dịch' });
+        setTranslating(false);
+        return;
+      }
+
+      // Gọi API background translation
+      const response = await fetch('/api/translate/background', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          chapterIds: finalChapterIds,
+        }),
       });
 
       const data = await response.json();
 
       if (data.success) {
-        const successCount = data.data.results.filter((r: { status: string }) => r.status === 'success').length;
         setMessage({
           type: 'success',
-          text: `Đã dịch ${successCount}/${data.data.processed} chương!`,
+          text: `Đã bắt đầu dịch ${finalChapterIds.length} chương trong background. Vui lòng refresh sau vài phút.`,
         });
         setSelectedChapters(new Set());
-        fetchChapters(selectedStoryId);
       } else {
         setMessage({ type: 'error', text: data.error || 'Có lỗi xảy ra' });
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: 'Lỗi kết nối' });
     } finally {
       setTranslating(false);
@@ -139,6 +152,11 @@ export default function TranslatePage() {
   const pendingChapters = chapters.filter(ch => ch.status === 'pending' && ch.originalContent);
   const translatedChapters = chapters.filter(ch => ch.status === 'completed');
   const chaptersWithContent = chapters.filter(ch => ch.originalContent && ch.originalContent.trim());
+  
+  // Filter chapters theo status
+  const filteredChapters = statusFilter === 'all' 
+    ? chapters 
+    : chapters.filter(ch => ch.status === statusFilter);
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black py-8 px-4">
@@ -239,18 +257,42 @@ export default function TranslatePage() {
           {/* Right Panel - Chapter List */}
           <div className="lg:col-span-2">
             <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold text-black dark:text-zinc-50 mb-4">
-                Danh Sách Chương ({chapters.length})
-              </h2>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-black dark:text-zinc-50">
+                  Danh Sách Chương ({filteredChapters.length}/{chapters.length})
+                </h2>
+                <div className="flex gap-2">
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-black dark:text-zinc-50 text-sm"
+                  >
+                    <option value="all">Tất cả</option>
+                    <option value="pending">Chờ dịch</option>
+                    <option value="translating">Đang dịch</option>
+                    <option value="completed">Đã dịch</option>
+                    <option value="failed">Lỗi</option>
+                  </select>
+                  <button
+                    onClick={() => selectedStoryId && fetchChapters(selectedStoryId)}
+                    disabled={loading || !selectedStoryId}
+                    className="px-4 py-2 bg-zinc-600 hover:bg-zinc-700 text-white rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    🔄 Refresh
+                  </button>
+                </div>
+              </div>
               {loading ? (
                 <p className="text-zinc-600 dark:text-zinc-400">Đang tải...</p>
-              ) : chapters.length === 0 ? (
+              ) : filteredChapters.length === 0 ? (
                 <p className="text-zinc-600 dark:text-zinc-400">
-                  {selectedStoryId ? 'Chưa có chương nào' : 'Vui lòng chọn truyện'}
+                  {selectedStoryId 
+                    ? `Không có chương nào với status "${statusFilter}"` 
+                    : 'Vui lòng chọn truyện'}
                 </p>
               ) : (
                 <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {chapters.map((chapter) => {
+                  {filteredChapters.map((chapter) => {
                     const isSelected = selectedChapters.has(chapter._id);
                     const canSelect = chapter.originalContent && chapter.originalContent.trim();
                     return (

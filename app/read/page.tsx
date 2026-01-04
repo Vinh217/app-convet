@@ -55,14 +55,17 @@ export default function ReadPage() {
   const fetchChapters = async (storyId: string) => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/stories/${storyId}/chapters`);
+      // Chỉ lấy các chương đã dịch (API tối ưu)
+      const response = await fetch(`/api/stories/${storyId}/chapters/translated`);
       const data = await response.json();
       if (data.success) {
-        const chaptersWithStringId = data.data.map((chapter: { _id: { toString: () => string } | string; [key: string]: unknown }) => ({
-          ...chapter,
-          _id: typeof chapter._id === 'object' && chapter._id !== null && 'toString' in chapter._id 
-            ? chapter._id.toString() 
-            : String(chapter._id),
+        // Convert sang format Chapter với _id giả (không cần thật)
+        const chaptersWithStringId = data.data.map((ch: { chapterNumber: number; title: string }, index: number) => ({
+          _id: `temp-${index}`,
+          chapterNumber: ch.chapterNumber,
+          title: ch.title,
+          translatedContent: '', // Không cần load content ở đây
+          status: 'completed',
         }));
         setChapters(chaptersWithStringId as Chapter[]);
       }
@@ -72,8 +75,6 @@ export default function ReadPage() {
       setLoading(false);
     }
   };
-
-  const translatedChapters = chapters.filter(ch => ch.translatedContent && ch.status === 'completed');
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 py-4 px-4">
@@ -111,15 +112,15 @@ export default function ReadPage() {
         {selectedStoryId && (
           <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-md p-6">
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              Danh Sách Chương ({translatedChapters.length} chương đã dịch)
+              Danh Sách Chương ({chapters.length} chương đã dịch)
             </h2>
             {loading ? (
               <p className="text-zinc-600 dark:text-zinc-400">Đang tải...</p>
-            ) : translatedChapters.length === 0 ? (
+            ) : chapters.length === 0 ? (
               <p className="text-zinc-600 dark:text-zinc-400">Chưa có chương nào đã dịch</p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {translatedChapters.map((chapter) => (
+                {chapters.map((chapter) => (
                   <button
                     key={chapter._id}
                     onClick={() => router.push(`/read/${selectedStoryId}/${chapter.chapterNumber}`)}
