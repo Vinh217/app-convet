@@ -1,0 +1,154 @@
+import clientPromise from './mongodb';
+import { ObjectId } from 'mongodb';
+
+export interface Chapter {
+  _id?: ObjectId;
+  storyId: string;
+  chapterNumber: number;
+  title: string;
+  originalContent: string;
+  translatedContent?: string;
+  url: string;
+  status: 'pending' | 'translating' | 'completed' | 'failed';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Story {
+  _id?: ObjectId;
+  title: string;
+  originalTitle?: string;
+  url: string;
+  description?: string;
+  author?: string;
+  totalChapters?: number;
+  crawledChapters?: number;
+  status: 'crawling' | 'translating' | 'completed' | 'paused';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export async function getStories() {
+  const client = await clientPromise;
+  const db = client.db();
+  return db.collection<Story>('stories').find({}).sort({ createdAt: -1 }).toArray();
+}
+
+export async function getStoryById(id: string) {
+  const client = await clientPromise;
+  const db = client.db();
+  return db.collection<Story>('stories').findOne({ _id: new ObjectId(id) });
+}
+
+export async function createStory(story: Omit<Story, '_id' | 'createdAt' | 'updatedAt'>) {
+  const client = await clientPromise;
+  const db = client.db();
+  const now = new Date();
+  const result = await db.collection<Story>('stories').insertOne({
+    ...story,
+    createdAt: now,
+    updatedAt: now,
+  });
+  return result.insertedId;
+}
+
+export async function updateStory(id: string, updates: Partial<Story>) {
+  const client = await clientPromise;
+  const db = client.db();
+  return db.collection<Story>('stories').updateOne(
+    { _id: new ObjectId(id) },
+    { $set: { ...updates, updatedAt: new Date() } }
+  );
+}
+
+export async function getChaptersByStoryId(storyId: string) {
+  const client = await clientPromise;
+  const db = client.db();
+  return db.collection<Chapter>('chapters').find({ storyId }).sort({ chapterNumber: 1 }).toArray();
+}
+
+export async function getChapterById(id: string) {
+  const client = await clientPromise;
+  const db = client.db();
+  return db.collection<Chapter>('chapters').findOne({ _id: new ObjectId(id) });
+}
+
+export async function createChapter(chapter: Omit<Chapter, '_id' | 'createdAt' | 'updatedAt'>) {
+  const client = await clientPromise;
+  const db = client.db();
+  const now = new Date();
+  const result = await db.collection<Chapter>('chapters').insertOne({
+    ...chapter,
+    createdAt: now,
+    updatedAt: now,
+  });
+  return result.insertedId;
+}
+
+export async function updateChapter(id: string, updates: Partial<Chapter>) {
+  const client = await clientPromise;
+  const db = client.db();
+  return db.collection<Chapter>('chapters').updateOne(
+    { _id: new ObjectId(id) },
+    { $set: { ...updates, updatedAt: new Date() } }
+  );
+}
+
+export async function getPendingChapters(limit: number = 10) {
+  const client = await clientPromise;
+  const db = client.db();
+  return db.collection<Chapter>('chapters')
+    .find({ status: 'pending' })
+    .sort({ createdAt: 1 })
+    .limit(limit)
+    .toArray();
+}
+
+export async function getChapterByNumber(storyId: string, chapterNumber: number) {
+  const client = await clientPromise;
+  const db = client.db();
+  return db.collection<Chapter>('chapters').findOne({ 
+    storyId,
+    chapterNumber: Number(chapterNumber)
+  });
+}
+
+export interface StoryContext {
+  _id?: ObjectId;
+  storyId: string;
+  characters: Array<{ name: string; description: string; personality?: string }>;
+  terms: Array<{ term: string; meaning: string }>;
+  settings: Array<{ location: string; description: string }>;
+  plotPoints: Array<{ point: string; description: string }>;
+  updatedAt: Date;
+}
+
+export async function getStoryContext(storyId: string) {
+  const client = await clientPromise;
+  const db = client.db();
+  return db.collection<StoryContext>('storyContexts').findOne({ storyId });
+}
+
+export async function updateStoryContext(storyId: string, context: Partial<StoryContext>) {
+  const client = await clientPromise;
+  const db = client.db();
+  const existing = await db.collection<StoryContext>('storyContexts').findOne({ storyId });
+  
+  if (existing) {
+    return db.collection<StoryContext>('storyContexts').updateOne(
+      { storyId },
+      { $set: { ...context, updatedAt: new Date() } }
+    );
+  } else {
+    return db.collection<StoryContext>('storyContexts').insertOne({
+      storyId,
+      characters: [],
+      terms: [],
+      settings: [],
+      plotPoints: [],
+      ...context,
+      updatedAt: new Date(),
+    });
+  }
+}
+
