@@ -76,6 +76,12 @@ export default function Home() {
               >
                 Đến Trang Dịch
               </button>
+              <button
+                onClick={() => router.push('/read')}
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 px-4 rounded-md"
+              >
+                Đọc Truyện
+              </button>
             </div>
           </div>
 
