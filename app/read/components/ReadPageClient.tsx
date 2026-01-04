@@ -83,28 +83,50 @@ export default function ReadPageClient({
         </div>
 
         {selectedStoryId && (
-          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-md p-6">
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
-              Danh Sách Chương ({chapters.length} chương đã dịch)
-            </h2>
+          <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-md overflow-hidden">
+            <div className="p-6 border-b border-zinc-200 dark:border-zinc-700">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                Danh Sách Chương ({chapters.length} chương đã dịch)
+              </h2>
+            </div>
             {isPending ? (
-              <p className="text-zinc-600 dark:text-zinc-400">Đang tải...</p>
+              <div className="p-6">
+                <p className="text-zinc-600 dark:text-zinc-400">Đang tải...</p>
+              </div>
             ) : chapters.length === 0 ? (
-              <p className="text-zinc-600 dark:text-zinc-400">Chưa có chương nào đã dịch</p>
+              <div className="p-6">
+                <p className="text-zinc-600 dark:text-zinc-400">Chưa có chương nào đã dịch</p>
+              </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
                 {chapters.map((chapter) => (
                   <button
                     key={chapter.chapterNumber}
                     onClick={() => router.push(`/read/${selectedStoryId}/${chapter.chapterNumber}`)}
-                    className="p-3 bg-zinc-100 dark:bg-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-600 rounded-lg text-left transition-colors"
+                    className="w-full px-6 py-4 text-left hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors"
                   >
-                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                      Chương {chapter.chapterNumber}
-                    </p>
-                    <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1 line-clamp-2">
-                      {chapter.title}
-                    </p>
+                    <div className="flex items-start gap-4">
+                      <div className="shrink-0 w-16 sm:w-20">
+                        <span className="inline-block px-3 py-1 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-md text-sm font-medium">
+                          Ch. {chapter.chapterNumber}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm sm:text-base text-zinc-900 dark:text-zinc-50 leading-relaxed">
+                          {chapter.title}
+                        </p>
+                      </div>
+                      <div className="shrink-0">
+                        <svg 
+                          className="w-5 h-5 text-zinc-400 dark:text-zinc-500" 
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                    </div>
                   </button>
                 ))}
               </div>
