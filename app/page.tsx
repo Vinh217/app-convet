@@ -73,17 +73,17 @@ export default function Home() {
               <button
                 onClick={() => router.push('/translate')}
                 className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-md"
-              >
+            >
                 Đến Trang Dịch
               </button>
               <button
                 onClick={() => router.push('/read')}
                 className="w-full bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 px-4 rounded-md"
-              >
+            >
                 Đọc Truyện
               </button>
             </div>
-          </div>
+        </div>
 
           {/* Right Column - Story List */}
           <div className="lg:col-span-2">

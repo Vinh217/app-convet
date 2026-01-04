@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  reactStrictMode: false, // Tắt React Strict Mode để tránh double render
 };
 
 export default nextConfig;
