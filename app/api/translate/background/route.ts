@@ -159,41 +159,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Trên Vercel, cần đợi ít nhất job đầu tiên bắt đầu để đảm bảo nó chạy
-    // Xử lý tuần tự với delay để tránh rate limit và đảm bảo jobs chạy trên Vercel
-    const processTranslations = async () => {
-      for (let i = 0; i < chapterIds.length; i++) {
-        const chapterId = chapterIds[i];
-        try {
-          // Delay giữa các chương (trừ chương đầu tiên)
-          if (i > 0) {
-            await new Promise(resolve => setTimeout(resolve, 2000)); // 2s delay
-          }
-          
-          console.log(`[BACKGROUND] Processing chapter ${i + 1}/${chapterIds.length}: ${chapterId}`);
-          await translateChapterInBackground(chapterId, apiKey, model || 'deepseek-chat');
-          console.log(`[BACKGROUND] Completed chapter ${i + 1}/${chapterIds.length}: ${chapterId}`);
-        } catch (error) {
-          console.error(`[BACKGROUND] Error translating chapter ${chapterId}:`, error);
-        }
-      }
-    };
-
-    // Bắt đầu job đầu tiên và đợi nó bắt đầu chạy (ít nhất update status)
-    // Điều này đảm bảo Vercel không terminate function ngay
-    const firstChapterId = chapterIds[0];
-    if (firstChapterId) {
-      // Bắt đầu job đầu tiên và đợi nó update status
-      const firstJob = translateChapterInBackground(firstChapterId, apiKey, model || 'deepseek-chat');
-      
-      // Đợi ít nhất 2 giây để job đầu tiên bắt đầu chạy
-      await Promise.race([
-        firstJob,
-        new Promise(resolve => setTimeout(resolve, 2000))
-      ]);
-    }
-
-    // Trả về response sau khi job đầu tiên đã bắt đầu
+    // Trả về response ngay, dịch chạy ngầm
     const response = NextResponse.json({
       success: true,
       message: `Đã bắt đầu dịch ${chapterIds.length} chương trong background`,
@@ -203,10 +169,21 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Tiếp tục xử lý các job còn lại trong background
-    // Không await để trả response ngay
-    processTranslations().catch(error => {
-      console.error('[BACKGROUND] Error in background translation process:', error);
+    // Chạy dịch ngầm (không await)
+    await Promise.all(
+      chapterIds.map(async (chapterId: string, index: number) => {
+        // Delay giữa các chương để tránh rate limit
+        return new Promise(resolve => {
+          setTimeout(async () => {
+            console.log('chapterId', chapterId)
+            await translateChapterInBackground(chapterId, apiKey, model || 'deepseek-chat');
+            console.log('chapterId done', chapterId)
+            resolve(null);
+          }, index * 2000); // 2s delay giữa mỗi chương
+        });
+      })
+    ).catch(error => {
+      console.error('Error in background translation:', error);
     });
 
     return response;
