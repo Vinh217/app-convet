@@ -9,26 +9,38 @@ async function translateChapterInBackground(
   apiKey: string,
   model: string
 ) {
+  const chapterStartTime = Date.now();
+  console.log(`[BACKGROUND] Starting translation for chapter ${chapterId}`);
+  
   try {
     const chapter = await getChapterById(chapterId);
     if (!chapter || !chapter.originalContent || !chapter.originalContent.trim()) {
+      console.error(`[BACKGROUND] Chapter ${chapterId}: No content found`);
       await updateChapter(chapterId, { status: 'failed' });
       return;
     }
+
+    console.log(`[BACKGROUND] Chapter ${chapterId}: Content length ${chapter.originalContent.length} chars, Chapter ${chapter.chapterNumber}: ${chapter.title}`);
 
     // Cập nhật status thành translating
     await updateChapter(chapterId, { status: 'translating' });
 
     // Lấy context từ các chương trước
+    const contextStartTime = Date.now();
     const existingContext = await getStoryContext(chapter.storyId);
+    const contextDuration = ((Date.now() - contextStartTime) / 1000).toFixed(2);
+    console.log(`[BACKGROUND] Chapter ${chapterId}: Context loaded in ${contextDuration}s`);
 
     // Dịch nội dung với context
+    const translateStartTime = Date.now();
     const translatedText = await translateLongText(
       chapter.originalContent,
       apiKey,
       model || 'deepseek-chat',
       existingContext
     );
+    const translateDuration = ((Date.now() - translateStartTime) / 1000).toFixed(2);
+    console.log(`[BACKGROUND] Chapter ${chapterId}: Translation completed in ${translateDuration}s, output length: ${translatedText.length} chars`);
 
     // Cập nhật chapter với nội dung đã dịch
     await updateChapter(chapterId, {
@@ -38,13 +50,16 @@ async function translateChapterInBackground(
 
     // Extract context từ chương vừa dịch và cập nhật
     try {
-      console.time(`extractContext-chapter-${chapterId}`);
+      const extractStartTime = Date.now();
+      console.log(`[BACKGROUND] Chapter ${chapterId}: Extracting context...`);
       const extractedContext = await extractContextFromChapter(
         translatedText,
         apiKey,
         model || 'deepseek-chat'
       );
-      console.timeEnd(`extractContext-chapter-${chapterId}`);
+      const extractDuration = ((Date.now() - extractStartTime) / 1000).toFixed(2);
+      console.log(`[BACKGROUND] Chapter ${chapterId}: Context extracted in ${extractDuration}s`);
+      
       const mergedContext = existingContext
         ? mergeContexts(
             {
@@ -59,11 +74,15 @@ async function translateChapterInBackground(
 
       await updateStoryContext(chapter.storyId, mergedContext);
     } catch (error) {
-      console.error('Error extracting context:', error);
+      console.error(`[BACKGROUND] Chapter ${chapterId}: Error extracting context:`, error);
       // Không fail nếu extract context lỗi
     }
+
+    const totalDuration = ((Date.now() - chapterStartTime) / 1000).toFixed(2);
+    console.log(`[BACKGROUND] Chapter ${chapterId}: ✅ Completed successfully in ${totalDuration}s total`);
   } catch (error) {
-    console.error(`Error translating chapter ${chapterId}:`, error);
+    const totalDuration = ((Date.now() - chapterStartTime) / 1000).toFixed(2);
+    console.error(`[BACKGROUND] Chapter ${chapterId}: ❌ Failed after ${totalDuration}s:`, error);
     await updateChapter(chapterId, { status: 'failed' });
   }
 }

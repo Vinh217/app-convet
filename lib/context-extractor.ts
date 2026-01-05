@@ -18,6 +18,7 @@ export async function extractContextFromChapter(
       apiKey: apiKey,
     });
 
+    const extractStartTime = Date.now();
     const completion = await openai.chat.completions.create({
       model: model,
       messages: [
@@ -48,6 +49,16 @@ Trả về dưới dạng JSON với format:
       max_tokens: 8000,
       response_format: { type: 'json_object' },
     });
+    const extractEndTime = Date.now();
+    const extractDuration = ((extractEndTime - extractStartTime) / 1000).toFixed(2);
+
+    // Log token usage
+    const usage = completion.usage;
+    if (usage) {
+      console.log(`[CONTEXT] Token Usage - Input: ${usage.prompt_tokens}, Output: ${usage.completion_tokens}, Total: ${usage.total_tokens}, Time: ${extractDuration}s`);
+    } else {
+      console.log(`[CONTEXT] Context extraction completed in ${extractDuration}s (token usage not available)`);
+    }
 
     const responseText = completion.choices[0]?.message?.content;
     if (!responseText) {

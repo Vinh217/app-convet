@@ -67,8 +67,7 @@ export async function getTranslatedChaptersList(storyId: string) {
     const chapters = await getChaptersByStoryId(storyId);
     
     // Chỉ lấy các chương đã dịch
-    const translatedChapters = chapters
-      .filter(ch => ch.translatedContent && ch.status === 'completed')
+    const translatedChapters = chapters.chapters.filter(ch => ch.translatedContent && ch.status === 'completed')
       .map(ch => ({
         chapterNumber: ch.chapterNumber,
         title: ch.title,

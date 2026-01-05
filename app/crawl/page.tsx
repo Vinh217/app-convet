@@ -63,7 +63,7 @@ export default function CrawlPage() {
       const response = await fetch('/api/stories');
       const data = await response.json();
       if (data.success) {
-        const storiesWithStringId = data.data.map((story: any) => ({
+        const storiesWithStringId = data.data.map((story: Story) => ({
           ...story,
           _id: story._id.toString(),
         }));
@@ -80,7 +80,7 @@ export default function CrawlPage() {
       const response = await fetch(`/api/stories/${storyId}/chapters`);
       const data = await response.json();
       if (data.success) {
-        const chaptersWithStringId = data.data.map((chapter: any) => ({
+        const chaptersWithStringId = data.data.chapters.map((chapter: Chapter) => ({
           ...chapter,
           _id: chapter._id.toString(),
         }));

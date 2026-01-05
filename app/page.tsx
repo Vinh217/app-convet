@@ -30,7 +30,7 @@ export default function Home() {
       const data = await response.json();
       if (data.success) {
         // Convert ObjectId to string for UI
-        const storiesWithStringId = data.data.map((story: any) => ({
+        const storiesWithStringId = data.data.map((story: Story) => ({
           ...story,
           _id: story._id.toString(),
         }));

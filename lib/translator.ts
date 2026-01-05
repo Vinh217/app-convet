@@ -51,6 +51,7 @@ export async function translateWithDeepSeek(
       }
     }
 
+    const startTime = Date.now();
     const completion = await openai.chat.completions.create({
       model: model,
       messages: [
@@ -93,6 +94,16 @@ export async function translateWithDeepSeek(
       temperature: 0.7,
       max_tokens: 8000,
     });
+    const endTime = Date.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+    // Log token usage
+    const usage = completion.usage;
+    if (usage) {
+      console.log(`[TRANSLATE] Token Usage - Input: ${usage.prompt_tokens}, Output: ${usage.completion_tokens}, Total: ${usage.total_tokens}, Time: ${duration}s`);
+    } else {
+      console.log(`[TRANSLATE] Translation completed in ${duration}s (token usage not available)`);
+    }
 
     const translatedText = completion.choices[0]?.message?.content;
     if (!translatedText) {
@@ -141,12 +152,20 @@ export async function translateLongText(
 ): Promise<string> {
   const chunks = splitTextIntoChunks(text);
   const translatedChunks: string[] = [];
+  const overallStartTime = Date.now();
+
+  console.log(`[TRANSLATE] Starting translation of ${chunks.length} chunk(s), total text length: ${text.length} chars`);
 
   for (let i = 0; i < chunks.length; i++) {
-    console.time(`translateLongText-chunk-${i}`);
-    console.log(`Translating chunk ${i + 1}/${chunks.length}...`);
+    const chunkStartTime = Date.now();
+    console.log(`[TRANSLATE] Processing chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)...`);
+    
     const translated = await translateWithDeepSeek(chunks[i], apiKey, model, context);
-    console.timeEnd(`translateLongText-chunk-${i}`);
+    
+    const chunkEndTime = Date.now();
+    const chunkDuration = ((chunkEndTime - chunkStartTime) / 1000).toFixed(2);
+    console.log(`[TRANSLATE] Chunk ${i + 1}/${chunks.length} completed in ${chunkDuration}s`);
+    
     translatedChunks.push(translated);
 
     // Delay giữa các request để tránh rate limit
@@ -154,6 +173,10 @@ export async function translateLongText(
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
   }
+
+  const overallEndTime = Date.now();
+  const overallDuration = ((overallEndTime - overallStartTime) / 1000).toFixed(2);
+  console.log(`[TRANSLATE] All chunks completed in ${overallDuration}s`);
 
   return translatedChunks.join('\n\n');
 }
