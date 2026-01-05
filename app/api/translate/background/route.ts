@@ -38,12 +38,13 @@ async function translateChapterInBackground(
 
     // Extract context từ chương vừa dịch và cập nhật
     try {
+      console.time(`extractContext-chapter-${chapterId}`);
       const extractedContext = await extractContextFromChapter(
         translatedText,
         apiKey,
         model || 'deepseek-chat'
       );
-      
+      console.timeEnd(`extractContext-chapter-${chapterId}`);
       const mergedContext = existingContext
         ? mergeContexts(
             {

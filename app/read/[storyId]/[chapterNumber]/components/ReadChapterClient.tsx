@@ -270,7 +270,7 @@ export default function ReadChapterClient({
                       onClick={() => saveTextColor(preset.value)}
                       className={`p-3 rounded-lg border-2 transition-all ${
                         textColor === preset.value
-                          ? 'border-zinc-900 dark:border-zinc-100'
+                          ? 'border-zinc-100'
                           : 'border-zinc-200 dark:border-zinc-700'
                       }`}
                       style={{ 
@@ -310,7 +310,7 @@ export default function ReadChapterClient({
       )}
 
       {/* Content */}
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-10 pb-20">
         <div 
           className="leading-relaxed"
           style={{
@@ -356,7 +356,7 @@ export default function ReadChapterClient({
             <button
               onClick={() => prevChapter && navigateChapter(prevChapter.chapterNumber)}
               disabled={!prevChapter}
-              className="flex-1 px-4 py-3 rounded-lg font-medium transition-opacity disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-70"
+              className="px-4 py-2 rounded-lg font-medium transition-opacity disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-70"
               style={{ 
                 backgroundColor: `${textColor}15`,
                 color: textColor 
@@ -383,7 +383,7 @@ export default function ReadChapterClient({
             <button
               onClick={() => nextChapter && navigateChapter(nextChapter.chapterNumber)}
               disabled={!nextChapter}
-              className="flex-1 px-4 py-3 rounded-lg font-medium transition-opacity disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-70"
+              className="px-4 py-2 rounded-lg font-medium transition-opacity disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-70"
               style={{ 
                 backgroundColor: `${textColor}15`,
                 color: textColor 

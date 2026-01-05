@@ -2,6 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Select } from '@/components/ui/Select';
+import { Badge } from '@/components/ui/Badge';
+import { ArrowLeftIcon, GlobeAltIcon, CheckIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 interface Story {
   _id: string;
@@ -21,7 +26,7 @@ interface Chapter {
 export default function TranslatePage() {
   const router = useRouter();
   const [stories, setStories] = useState<Story[]>([]);
-  const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
+  const [selectedStoryId, setSelectedStoryId] = useState<string>('');
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [selectedChapters, setSelectedChapters] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
@@ -36,6 +41,8 @@ export default function TranslatePage() {
   useEffect(() => {
     if (selectedStoryId) {
       fetchChapters(selectedStoryId);
+    } else {
+      setChapters([]);
     }
   }, [selectedStoryId]);
 
@@ -44,13 +51,11 @@ export default function TranslatePage() {
       const response = await fetch('/api/stories');
       const data = await response.json();
       if (data.success) {
-        const storiesWithStringId = data.data.map((story: { _id: { toString: () => string } | string; [key: string]: unknown }) => ({
+        const storiesWithStringId = data.data.map((story: any) => ({
           ...story,
-          _id: typeof story._id === 'object' && story._id !== null && 'toString' in story._id 
-            ? story._id.toString() 
-            : String(story._id),
+          _id: story._id.toString(),
         }));
-        setStories(storiesWithStringId as Story[]);
+        setStories(storiesWithStringId);
       }
     } catch (error) {
       console.error('Error fetching stories:', error);
@@ -63,13 +68,11 @@ export default function TranslatePage() {
       const response = await fetch(`/api/stories/${storyId}/chapters`);
       const data = await response.json();
       if (data.success) {
-        const chaptersWithStringId = data.data.map((chapter: { _id: { toString: () => string } | string; [key: string]: unknown }) => ({
+         const chaptersWithStringId = data.data.map((chapter: any) => ({
           ...chapter,
-          _id: typeof chapter._id === 'object' && chapter._id !== null && 'toString' in chapter._id 
-            ? chapter._id.toString() 
-            : String(chapter._id),
+          _id: chapter._id.toString(),
         }));
-        setChapters(chaptersWithStringId as Chapter[]);
+        setChapters(chaptersWithStringId);
       }
     } catch (error) {
       console.error('Error fetching chapters:', error);
@@ -92,7 +95,6 @@ export default function TranslatePage() {
         ? Array.from(selectedChapters)
         : null;
 
-      // Nếu không có chương được chọn, lấy 5 chương pending
       let finalChapterIds = chapterIds;
       if (!finalChapterIds || finalChapterIds.length === 0) {
         const pendingChapters = chapters.filter(ch => 
@@ -107,7 +109,12 @@ export default function TranslatePage() {
         return;
       }
 
-      // Gọi API background translation
+      // Updated endpoint path based on task plan - though I might have deleted it?
+      // Wait, plan said delete `api/translate/batch/route.ts` because it was unused
+      // and used `api/translate/background` in the original file. 
+      // I kept `api/translate/background/route.ts` intact in my delete commands.
+      // So I should use the correct endpoint. ORIGINAL file used `/api/translate/background`.
+      
       const response = await fetch('/api/translate/background', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -121,7 +128,7 @@ export default function TranslatePage() {
       if (data.success) {
         setMessage({
           type: 'success',
-          text: `Đã bắt đầu dịch ${finalChapterIds.length} chương trong background. Vui lòng refresh sau vài phút.`,
+          text: `Đã bắt đầu dịch ${finalChapterIds.length} chương trong background.`,
         });
         setSelectedChapters(new Set());
       } else {
@@ -144,228 +151,188 @@ export default function TranslatePage() {
     setSelectedChapters(newSelected);
   };
 
-
-  const clearSelection = () => {
-    setSelectedChapters(new Set());
-  };
-
   const pendingChapters = chapters.filter(ch => ch.status === 'pending' && ch.originalContent);
   const translatedChapters = chapters.filter(ch => ch.status === 'completed');
   const chaptersWithContent = chapters.filter(ch => ch.originalContent && ch.originalContent.trim());
   
-  // Filter chapters theo status
   const filteredChapters = statusFilter === 'all' 
     ? chapters 
     : chapters.filter(ch => ch.status === statusFilter);
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black py-8 px-4">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-4xl font-bold text-black dark:text-zinc-50">
-            Dịch Truyện
-          </h1>
-          <button
-            onClick={() => router.push('/')}
-            className="px-4 py-2 bg-zinc-600 hover:bg-zinc-700 text-white rounded-md"
-          >
-            Về trang chủ
-          </button>
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="sm" onClick={() => router.back()}>
+          <ArrowLeftIcon className="w-4 h-4 mr-2" />
+          Quay lại
+        </Button>
+        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">Dịch Truyện</h1>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Panel */}
-          <div className="lg:col-span-1 space-y-6">
-            <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-semibold text-black dark:text-zinc-50 mb-4">
-                Chọn Truyện
-              </h2>
-              <select
-                value={selectedStoryId || ''}
-                onChange={(e) => setSelectedStoryId(e.target.value || null)}
-                className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-black dark:text-zinc-50"
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Left Control Panel */}
+        <div className="xl:col-span-1 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Chọn Truyện & Cấu Hình</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <Select
+                label="Truyện cần dịch"
+                value={selectedStoryId}
+                onChange={(e) => setSelectedStoryId(e.target.value)}
               >
                 <option value="">-- Chọn truyện --</option>
                 {stories.map((story) => (
-                  <option key={story._id} value={story._id}>
-                    {story.title}
-                  </option>
+                  <option key={story._id} value={story._id}>{story.title}</option>
                 ))}
-              </select>
-            </div>
-
-            {selectedStoryId && (
-              <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-md p-6">
-                <h2 className="text-xl font-semibold text-black dark:text-zinc-50 mb-4">
-                  Dịch Hàng Loạt
-                </h2>
-                <div className="space-y-4">
-                  <div className="text-sm text-zinc-600 dark:text-zinc-400">
-                    <p>Chương chờ dịch: {pendingChapters.length}</p>
-                    <p>Chương đã dịch: {translatedChapters.length}</p>
-                    <p className="mt-2 font-medium text-zinc-700 dark:text-zinc-300">
-                      Đã chọn: {selectedChapters.size} chương
-                    </p>
+              </Select>
+              
+              {selectedStoryId && (
+                <div className="space-y-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="p-3 bg-zinc-50 dark:bg-zinc-800 rounded-lg">
+                      <p className="text-zinc-500 mb-1">Chờ dịch</p>
+                      <p className="font-bold text-lg">{pendingChapters.length}</p>
+                    </div>
+                    <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                       <p className="text-green-600 dark:text-green-400 mb-1">Đã dịch</p>
+                       <p className="font-bold text-lg text-green-700 dark:text-green-300">{translatedChapters.length}</p>
+                    </div>
                   </div>
-                  {chaptersWithContent.length > 0 && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
+
+                  <div className="flex gap-2">
+                     <Button 
+                       variant="secondary" 
+                       size="sm" 
+                       className="flex-1"
+                       onClick={() => {
                           const newSelected = new Set(selectedChapters);
                           chaptersWithContent.forEach(ch => newSelected.add(ch._id));
                           setSelectedChapters(newSelected);
-                        }}
-                        className="flex-1 px-3 py-2 bg-zinc-600 hover:bg-zinc-700 text-white text-sm rounded-md"
-                      >
-                        Chọn Tất Cả
-                      </button>
-                      <button
-                        onClick={clearSelection}
-                        className="flex-1 px-3 py-2 bg-zinc-500 hover:bg-zinc-600 text-white text-sm rounded-md"
-                      >
-                        Bỏ Chọn
-                      </button>
-                    </div>
-                  )}
-                  <button
+                       }}
+                       disabled={chaptersWithContent.length === 0}
+                     >
+                       Chọn Tất Cả
+                     </Button>
+                     <Button 
+                       variant="secondary" 
+                       size="sm" 
+                       className="flex-1"
+                       onClick={() => setSelectedChapters(new Set())}
+                       disabled={selectedChapters.size === 0}
+                     >
+                       Bỏ Chọn
+                     </Button>
+                  </div>
+
+                  <Button 
+                    className="w-full"
                     onClick={handleBatchTranslate}
-                    disabled={translating || (selectedChapters.size === 0 && chaptersWithContent.length === 0)}
-                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                    isLoading={translating}
+                    disabled={translating || (selectedChapters.size === 0 && pendingChapters.length === 0)}
                   >
-                    {translating 
-                      ? 'Đang dịch...' 
-                      : selectedChapters.size > 0
-                        ? `Dịch ${selectedChapters.size} Chương Đã Chọn`
-                        : 'Dịch Hàng Loạt (5 chương/lần)'}
-                  </button>
+                     <GlobeAltIcon className="w-5 h-5 mr-2" />
+                     {selectedChapters.size > 0 ? `Dịch ${selectedChapters.size} Chương` : 'Dịch Tiếp 5 Chương'}
+                  </Button>
+
                   {message && (
-                    <div
-                      className={`p-3 rounded-md text-sm ${
-                        message.type === 'success'
-                          ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
-                          : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
-                      }`}
-                    >
+                    <div className={`p-3 rounded-lg text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                       {message.text}
                     </div>
                   )}
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-          {/* Right Panel - Chapter List */}
-          <div className="lg:col-span-2">
-            <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-md p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-black dark:text-zinc-50">
-                  Danh Sách Chương ({filteredChapters.length}/{chapters.length})
-                </h2>
-                <div className="flex gap-2">
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md bg-white dark:bg-zinc-800 text-black dark:text-zinc-50 text-sm"
-                  >
-                    <option value="all">Tất cả</option>
-                    <option value="pending">Chờ dịch</option>
-                    <option value="translating">Đang dịch</option>
-                    <option value="completed">Đã dịch</option>
-                    <option value="failed">Lỗi</option>
-                  </select>
-                  <button
-                    onClick={() => selectedStoryId && fetchChapters(selectedStoryId)}
-                    disabled={loading || !selectedStoryId}
-                    className="px-4 py-2 bg-zinc-600 hover:bg-zinc-700 text-white rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    🔄 Refresh
-                  </button>
-                </div>
+        {/* Right Chapter List */}
+        <div className="xl:col-span-2">
+          <Card className="h-full flex flex-col">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Danh Sách Chương</CardTitle>
+              <div className="flex gap-2">
+                 <Select 
+                   value={statusFilter} 
+                   onChange={(e) => setStatusFilter(e.target.value)}
+                   className="!w-32 !py-1 !text-sm"
+                 >
+                   <option value="all">Tất cả</option>
+                   <option value="pending">Chờ dịch</option>
+                   <option value="translating">Đang Dịch</option>
+                   <option value="completed">Đã dịch</option>
+                   <option value="failed">Lỗi</option>
+                 </Select>
+                 <Button size="sm" variant="secondary" onClick={() => fetchChapters(selectedStoryId)} disabled={!selectedStoryId || loading}>
+                   Refresh
+                 </Button>
               </div>
-              {loading ? (
-                <p className="text-zinc-600 dark:text-zinc-400">Đang tải...</p>
-              ) : filteredChapters.length === 0 ? (
-                <p className="text-zinc-600 dark:text-zinc-400">
-                  {selectedStoryId 
-                    ? `Không có chương nào với status "${statusFilter}"` 
-                    : 'Vui lòng chọn truyện'}
-                </p>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto min-h-[500px] max-h-[800px]">
+              {chapters.length === 0 ? (
+                 <div className="h-full flex flex-col items-center justify-center text-zinc-500 opacity-60">
+                    <GlobeAltIcon className="w-16 h-16 mb-4" />
+                    <p>Chọn truyện để xem danh sách</p>
+                 </div>
               ) : (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
+                <div className="space-y-2">
                   {filteredChapters.map((chapter) => {
-                    const isSelected = selectedChapters.has(chapter._id);
-                    const canSelect = chapter.originalContent && chapter.originalContent.trim();
-                    return (
-                      <div
-                        key={chapter._id}
-                        className={`p-3 rounded border transition-colors ${
-                          canSelect ? 'cursor-pointer' : ''
-                        } ${
-                          isSelected
-                            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-400 dark:border-blue-600'
-                            : chapter.status === 'completed'
-                            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-                            : chapter.status === 'translating'
-                            ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
-                            : chapter.status === 'failed'
-                            ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                            : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700'
-                        }`}
-                        onClick={() => canSelect && toggleChapterSelection(chapter._id)}
-                      >
-                        <div className="flex justify-between items-start gap-2">
-                          <div className="flex items-start gap-2 flex-1">
-                            {canSelect && (
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleChapterSelection(chapter._id)}
-                                onClick={(e) => e.stopPropagation()}
-                                className="mt-1"
-                              />
-                            )}
-                            <div className="flex-1">
-                              <p className="font-medium text-black dark:text-zinc-50">
-                                {chapter.chapterNumber}. {chapter.title}
-                              </p>
-                              <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
-                                {chapter.originalContent ? `${chapter.originalContent.length} ký tự` : 'Chưa có nội dung'}
-                              </p>
-                              {chapter.status === 'completed' && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    router.push(`/compare/${selectedStoryId}/${chapter.chapterNumber}`);
-                                  }}
-                                  className="mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                                >
-                                  Xem so sánh
-                                </button>
-                              )}
-                            </div>
+                     const isSelected = selectedChapters.has(chapter._id);
+                     const canSelect = chapter.originalContent && chapter.originalContent.trim();
+                     return (
+                        <div 
+                          key={chapter._id}
+                          onClick={() => canSelect && toggleChapterSelection(chapter._id)}
+                          className={`
+                            p-3 rounded-lg border transition-all cursor-pointer flex items-center justify-between group
+                            ${isSelected 
+                              ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
+                              : 'bg-white dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800 hover:border-blue-300 dark:hover:border-blue-700'}
+                          `}
+                        >
+                          <div className="flex items-center gap-3">
+                             <input 
+                               type="checkbox" 
+                               checked={isSelected} 
+                               onChange={() => {}} 
+                               className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500" 
+                               disabled={!canSelect}
+                             />
+                             <div>
+                                <p className="font-medium text-sm text-zinc-900 dark:text-zinc-100">
+                                  {chapter.chapterNumber}. {chapter.title}
+                                </p>
+                                <div className="flex gap-2 mt-1">
+                                  {chapter.status === 'completed' && <Badge variant="success">Đã dịch</Badge>}
+                                  {chapter.status === 'translating' && <Badge variant="warning">Đang dịch</Badge>}
+                                  {chapter.status === 'failed' && <Badge variant="error">Lỗi</Badge>}
+                                  {chapter.status === 'pending' && <Badge variant="outline">Chờ dịch</Badge>}
+                                </div>
+                             </div>
                           </div>
-                          <span
-                            className={`px-2 py-1 rounded text-xs font-medium ${
-                              chapter.status === 'completed'
-                                ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
-                                : chapter.status === 'translating'
-                                ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
-                                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
-                            }`}
-                          >
-                            {chapter.status}
-                          </span>
+                          
+                          {chapter.status === 'completed' && (
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/compare/${selectedStoryId}/${chapter.chapterNumber}`);
+                              }}
+                            >
+                              Xem
+                            </Button>
+                          )}
                         </div>
-                      </div>
-                    );
+                     );
                   })}
                 </div>
               )}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
   );
 }
-

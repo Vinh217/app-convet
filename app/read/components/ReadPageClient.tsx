@@ -90,8 +90,23 @@ export default function ReadPageClient({
               </h2>
             </div>
             {isPending ? (
-              <div className="p-6">
-                <p className="text-zinc-600 dark:text-zinc-400">Đang tải...</p>
+              <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="px-6 py-4 animate-pulse">
+                    <div className="flex items-start gap-4">
+                      <div className="shrink-0 w-16 sm:w-20">
+                        <div className="h-7 w-16 bg-zinc-200 dark:bg-zinc-700 rounded-md" />
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <div className="h-5 w-full bg-zinc-200 dark:bg-zinc-700 rounded" />
+                        <div className="h-5 w-3/4 bg-zinc-200 dark:bg-zinc-700 rounded" />
+                      </div>
+                      <div className="shrink-0">
+                        <div className="h-5 w-5 bg-zinc-200 dark:bg-zinc-700 rounded" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : chapters.length === 0 ? (
               <div className="p-6">

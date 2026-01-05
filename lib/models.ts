@@ -63,10 +63,37 @@ export async function updateStory(id: string, updates: Partial<Story>) {
   );
 }
 
-export async function getChaptersByStoryId(storyId: string) {
+export async function getChaptersByStoryId(
+  storyId: string, 
+  options: { page?: number; limit?: number; status?: string } = {}
+) {
   const client = await clientPromise;
   const db = client.db();
-  return db.collection<Chapter>('chapters').find({ storyId }).sort({ chapterNumber: 1 }).toArray();
+  
+  const { page = 1, limit = 50, status } = options;
+  const skip = (page - 1) * limit;
+
+  const query: any = { storyId };
+  if (status) {
+    query.status = status;
+  }
+
+  const [chapters, total] = await Promise.all([
+    db.collection<Chapter>('chapters')
+      .find(query)
+      .sort({ chapterNumber: 1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray(),
+    db.collection<Chapter>('chapters').countDocuments(query)
+  ]);
+
+  return {
+    chapters,
+    total,
+    totalPages: Math.ceil(total / limit),
+    currentPage: page
+  };
 }
 
 export async function getChapterById(id: string) {
@@ -113,6 +140,17 @@ export async function getChapterByNumber(storyId: string, chapterNumber: number)
     storyId,
     chapterNumber: Number(chapterNumber)
   });
+}
+
+export async function getLatestChapter(storyId: string) {
+  const client = await clientPromise;
+  const db = client.db();
+  const chapters = await db.collection<Chapter>('chapters')
+    .find({ storyId, status: 'completed' })
+    .sort({ chapterNumber: -1 })
+    .limit(1)
+    .toArray();
+  return chapters[0];
 }
 
 export interface StoryContext {

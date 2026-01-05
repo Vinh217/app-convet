@@ -143,8 +143,10 @@ export async function translateLongText(
   const translatedChunks: string[] = [];
 
   for (let i = 0; i < chunks.length; i++) {
+    console.time(`translateLongText-chunk-${i}`);
     console.log(`Translating chunk ${i + 1}/${chunks.length}...`);
     const translated = await translateWithDeepSeek(chunks[i], apiKey, model, context);
+    console.timeEnd(`translateLongText-chunk-${i}`);
     translatedChunks.push(translated);
 
     // Delay giữa các request để tránh rate limit
