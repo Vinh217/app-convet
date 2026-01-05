@@ -12,6 +12,12 @@ export interface Chapter {
   translatedContent?: string;
   url: string;
   status: 'pending' | 'translating' | 'completed' | 'failed';
+  translationLogs?: Array<{
+    timestamp: Date;
+    level: 'info' | 'error' | 'success';
+    message: string;
+    data?: Record<string, unknown>;
+  }>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -120,6 +126,31 @@ export async function updateChapter(id: string, updates: Partial<Chapter>) {
   return db.collection<Chapter>('chapters').updateOne(
     { _id: new ObjectId(id) },
     { $set: { ...updates, updatedAt: new Date() } }
+  );
+}
+
+// Append log to chapter
+export async function appendChapterLog(
+  chapterId: string,
+  level: 'info' | 'error' | 'success',
+  message: string,
+  data?: Record<string, unknown>
+) {
+  const client = await clientPromise;
+  const db = client.db();
+  const logEntry = {
+    timestamp: new Date(),
+    level,
+    message,
+    ...(data && { data }),
+  };
+  
+  return db.collection<Chapter>('chapters').updateOne(
+    { _id: new ObjectId(chapterId) },
+    {
+      $push: { translationLogs: logEntry },
+      $set: { updatedAt: new Date() },
+    }
   );
 }
 

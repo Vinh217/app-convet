@@ -1,12 +1,22 @@
 import OpenAI from 'openai';
 import type { StoryContext } from './models';
 
+export interface TranslationResult {
+  text: string;
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    duration: number;
+  } | null;
+}
+
 export async function translateWithDeepSeek(
   text: string,
   apiKey: string,
   model: string = 'deepseek-chat',
   context?: StoryContext | null
-): Promise<string> {
+): Promise<TranslationResult> {
   try {
     const openai = new OpenAI({
       baseURL: 'https://api.deepseek.com',
@@ -97,20 +107,33 @@ export async function translateWithDeepSeek(
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
 
-    // Log token usage
-    const usage = completion.usage;
-    if (usage) {
-      console.log(`[TRANSLATE] Token Usage - Input: ${usage.prompt_tokens}, Output: ${usage.completion_tokens}, Total: ${usage.total_tokens}, Time: ${duration}s`);
-    } else {
-      console.log(`[TRANSLATE] Translation completed in ${duration}s (token usage not available)`);
-    }
-
     const translatedText = completion.choices[0]?.message?.content;
     if (!translatedText) {
       throw new Error('No translation returned from DeepSeek API');
     }
 
-    return translatedText.trim();
+    // Log token usage
+    const usage = completion.usage;
+    if (usage) {
+      const logMessage = `Token Usage - Input: ${usage.prompt_tokens}, Output: ${usage.completion_tokens}, Total: ${usage.total_tokens}, Time: ${duration}s`;
+      console.log(`[TRANSLATE] ${logMessage}`);
+      // Return usage info để có thể lưu vào database
+      return {
+        text: translatedText.trim(),
+        usage: {
+          promptTokens: usage.prompt_tokens,
+          completionTokens: usage.completion_tokens,
+          totalTokens: usage.total_tokens,
+          duration: parseFloat(duration),
+        },
+      };
+    } else {
+      console.log(`[TRANSLATE] Translation completed in ${duration}s (token usage not available)`);
+      return {
+        text: translatedText.trim(),
+        usage: null,
+      };
+    }
   } catch (error: unknown) {
     console.error('Error translating with DeepSeek:', error);
     if (error && typeof error === 'object' && 'status' in error && 'message' in error) {
@@ -148,19 +171,49 @@ export async function translateLongText(
   text: string,
   apiKey: string,
   model: string = 'deepseek-chat',
-  context?: StoryContext | null
+  context?: StoryContext | null,
+  chapterId?: string,
+  logToChapter?: (chapterId: string, level: 'info' | 'error' | 'success', message: string, data?: Record<string, unknown>) => Promise<void>
 ): Promise<string> {
   const chunks = splitTextIntoChunks(text);
   const translatedChunks: string[] = [];
   const overallStartTime = Date.now();
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let totalTokens = 0;
 
-  console.log(`[TRANSLATE] Starting translation of ${chunks.length} chunk(s), total text length: ${text.length} chars`);
+  const logMessage = `Starting translation of ${chunks.length} chunk(s), total text length: ${text.length} chars`;
+  console.log(`[TRANSLATE] ${logMessage}`);
+  if (chapterId && logToChapter) {
+    await logToChapter(chapterId, 'info', logMessage);
+  }
 
   for (let i = 0; i < chunks.length; i++) {
     const chunkStartTime = Date.now();
-    console.log(`[TRANSLATE] Processing chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)...`);
+    const chunkLogMessage = `Processing chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)...`;
+    console.log(`[TRANSLATE] ${chunkLogMessage}`);
+    if (chapterId && logToChapter) {
+      await logToChapter(chapterId, 'info', chunkLogMessage);
+    }
     
-    const translated = await translateWithDeepSeek(chunks[i], apiKey, model, context);
+    const result = await translateWithDeepSeek(chunks[i], apiKey, model, context);
+    const translated = typeof result === 'string' ? result : result.text;
+    
+    // Accumulate token usage
+    if (typeof result !== 'string' && result.usage) {
+      totalInputTokens += result.usage.promptTokens;
+      totalOutputTokens += result.usage.completionTokens;
+      totalTokens += result.usage.totalTokens;
+      
+      if (chapterId && logToChapter) {
+        await logToChapter(chapterId, 'info', `Chunk ${i + 1}/${chunks.length} token usage`, {
+          inputTokens: result.usage.promptTokens,
+          outputTokens: result.usage.completionTokens,
+          totalTokens: result.usage.totalTokens,
+          duration: `${result.usage.duration}s`,
+        });
+      }
+    }
     
     const chunkEndTime = Date.now();
     const chunkDuration = ((chunkEndTime - chunkStartTime) / 1000).toFixed(2);
@@ -176,7 +229,18 @@ export async function translateLongText(
 
   const overallEndTime = Date.now();
   const overallDuration = ((overallEndTime - overallStartTime) / 1000).toFixed(2);
-  console.log(`[TRANSLATE] All chunks completed in ${overallDuration}s`);
+  const finalLogMessage = `All chunks completed in ${overallDuration}s`;
+  console.log(`[TRANSLATE] ${finalLogMessage}`);
+  
+  if (chapterId && logToChapter && totalTokens > 0) {
+    await logToChapter(chapterId, 'info', 'Translation summary', {
+      totalDuration: `${overallDuration}s`,
+      totalInputTokens,
+      totalOutputTokens,
+      totalTokens,
+      chunksCount: chunks.length,
+    });
+  }
 
   return translatedChunks.join('\n\n');
 }
