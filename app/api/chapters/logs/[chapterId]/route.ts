@@ -32,7 +32,7 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch logs',
+        error: error instanceof Error ? error.message : 'Failed to fetch logs',
       },
       { status: 500 }
     );
