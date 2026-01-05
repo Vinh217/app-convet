@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
     // Lấy tất cả các chương chưa có nội dung
     const chapters = await getChaptersByStoryId(storyId);
-    const pendingChapters = chapters.filter(
+    const pendingChapters = chapters.chapters.filter(
       ch => !ch.originalContent || ch.originalContent.trim() === ''
     );
 
