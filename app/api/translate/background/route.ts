@@ -151,6 +151,7 @@ export async function POST(request: NextRequest) {
 
     // Lấy API key từ env
     const apiKey = process.env.DEEPSEEK_API_KEY;
+    console.log('apiKey', apiKey)
     
     if (!apiKey) {
       return NextResponse.json(
@@ -170,12 +171,14 @@ export async function POST(request: NextRequest) {
     });
 
     // Chạy dịch ngầm (không await)
-    Promise.all(
-      chapterIds.map((chapterId: string, index: number) => {
+    await Promise.all(
+      chapterIds.map(async (chapterId: string, index: number) => {
         // Delay giữa các chương để tránh rate limit
         return new Promise(resolve => {
           setTimeout(async () => {
+            console.log('chapterId', chapterId)
             await translateChapterInBackground(chapterId, apiKey, model || 'deepseek-chat');
+            console.log('chapterId done', chapterId)
             resolve(null);
           }, index * 2000); // 2s delay giữa mỗi chương
         });
