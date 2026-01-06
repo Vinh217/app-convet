@@ -71,17 +71,36 @@ export async function updateStory(id: string, updates: Partial<Story>) {
 
 export async function getChaptersByStoryId(
   storyId: string, 
-  options: { page?: number; limit?: number; status?: string } = {}
+  options: { page?: number; limit?: number; status?: string; search?: string } = {}
 ) {
   const client = await clientPromise;
   const db = client.db();
   
-  const { page = 1, limit = 50, status } = options;
+  const { page = 1, limit = 50, status, search } = options;
   const skip = (page - 1) * limit;
 
   const query: any = { storyId };
   if (status) {
     query.status = status;
+  }
+
+  // Add search filter at MongoDB level
+  if (search && search.trim()) {
+    const searchTrimmed = search.trim();
+    // Try to parse as number first (for chapter number search)
+    const searchNumber = parseInt(searchTrimmed, 10);
+    const isNumberSearch = !isNaN(searchNumber) && searchNumber.toString() === searchTrimmed;
+
+    if (isNumberSearch) {
+      // Exact match for chapter number
+      query.chapterNumber = searchNumber;
+    } else {
+      // Text search in title using regex (case-insensitive)
+      query.$or = [
+        { title: { $regex: searchTrimmed, $options: 'i' } },
+        { chapterNumber: { $regex: searchTrimmed, $options: 'i' } },
+      ];
+    }
   }
 
   const [chapters, total] = await Promise.all([
@@ -99,6 +118,97 @@ export async function getChaptersByStoryId(
     total,
     totalPages: Math.ceil(total / limit),
     currentPage: page
+  };
+}
+
+export async function getChaptersByRange(
+  storyId: string,
+  options: { from: number; to: number; status?: string } = { from: 1, to: 1 }
+) {
+  const client = await clientPromise;
+  const db = client.db();
+  
+  const { from, to, status } = options;
+
+  const query: any = { 
+    storyId,
+    chapterNumber: { $gte: from, $lte: to }
+  };
+  
+  if (status) {
+    query.status = status;
+  }
+
+  const chapters = await db.collection<Chapter>('chapters')
+    .find(query)
+    .sort({ chapterNumber: 1 })
+    .toArray();
+
+  return {
+    chapters,
+    count: chapters.length,
+  };
+}
+
+export async function getChaptersByNumbers(
+  storyId: string,
+  options: { numbers: number[]; status?: string } = { numbers: [] }
+) {
+  const client = await clientPromise;
+  const db = client.db();
+  
+  const { numbers, status } = options;
+
+  if (numbers.length === 0) {
+    return { chapters: [], count: 0 };
+  }
+
+  const query: any = { 
+    storyId,
+    chapterNumber: { $in: numbers }
+  };
+  
+  if (status) {
+    query.status = status;
+  }
+
+  const chapters = await db.collection<Chapter>('chapters')
+    .find(query)
+    .sort({ chapterNumber: 1 })
+    .toArray();
+
+  return {
+    chapters,
+    count: chapters.length,
+  };
+}
+
+export async function getChaptersFrom(
+  storyId: string,
+  options: { from: number; status?: string } = { from: 1 }
+) {
+  const client = await clientPromise;
+  const db = client.db();
+  
+  const { from, status } = options;
+
+  const query: any = { 
+    storyId,
+    chapterNumber: { $gte: from }
+  };
+  
+  if (status) {
+    query.status = status;
+  }
+
+  const chapters = await db.collection<Chapter>('chapters')
+    .find(query)
+    .sort({ chapterNumber: 1 })
+    .toArray();
+
+  return {
+    chapters,
+    count: chapters.length,
   };
 }
 

@@ -1,4 +1,4 @@
-import { getStoriesList, getChaptersList } from './actions';
+import { getStoriesList, getChaptersPaginated } from './actions';
 import TranslatePageClient from './components/TranslatePageClient';
 
 interface TranslatePageProps {
@@ -11,14 +11,17 @@ export default async function TranslatePage(props: TranslatePageProps) {
   const searchParams = await props.searchParams;
   const storyId = searchParams.storyId || null;
 
-  // Fetch stories và chapters (nếu có storyId) trên server
+  // Fetch stories và chỉ trang đầu tiên của chapters (nếu có storyId)
   const [storiesResult, chaptersResult] = await Promise.all([
     getStoriesList(),
-    storyId ? getChaptersList(storyId) : Promise.resolve({ success: true, data: [] }),
+    storyId
+      ? getChaptersPaginated({ storyId, page: 1, limit: 50 })
+      : Promise.resolve({ success: true, data: null }),
   ]);
 
   const stories = storiesResult.success ? storiesResult.data : [];
-  const chapters = chaptersResult.success ? chaptersResult.data : [];
+  const chapters =
+    chaptersResult.success && chaptersResult.data ? chaptersResult.data.chapters : [];
 
   return (
     <TranslatePageClient 

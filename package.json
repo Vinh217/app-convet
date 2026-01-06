@@ -10,12 +10,14 @@
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
+    "@tanstack/react-virtual": "^3.10.7",
     "axios": "^1.13.2",
     "cheerio": "^1.1.2",
     "inngest": "^3.48.1",
     "mongodb": "^6.21.0",
     "next": "16.1.1",
     "openai": "^4.104.0",
+    "use-debounce": "^10.0.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
