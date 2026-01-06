@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface Chapter {
@@ -53,61 +53,78 @@ export default function ReadChapterClient({
 }: ReadChapterClientProps) {
   const router = useRouter();
   
-  // Lazy initialization từ localStorage
-  const [fontSize, setFontSize] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('readFontSize');
-      return saved ? parseInt(saved, 10) : 18;
-    }
-    return 18;
-  });
-  
-  const [backgroundColor, setBackgroundColor] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('readBackgroundColor') || '#fef9e7';
-    }
-    return '#fef9e7';
-  });
-  
-  const [textColor, setTextColor] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('readTextColor') || '#27272a';
-    }
-    return '#27272a';
-  });
-  
+  // Initialize với giá trị mặc định (tránh hydration mismatch)
+  const [fontSize, setFontSize] = useState(18);
+  const [backgroundColor, setBackgroundColor] = useState('#fef9e7');
+  const [textColor, setTextColor] = useState('#27272a');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showFooter, setShowFooter] = useState(true); // Show by default
-  const [lastScrollY, setLastScrollY] = useState(0);
+  const lastScrollYRef = useRef(0);
   const lineHeight = 1.8;
+
+  // Load từ localStorage sau khi component mount (chỉ trên client)
+  // Điều này tránh hydration mismatch giữa server và client render
+  // Pattern này được chấp nhận trong Next.js để sync localStorage với state
+  // Note: React Compiler warning về setState trong effect có thể bỏ qua ở đây
+  // vì đây là pattern hợp lý để sync localStorage với React state
+  useEffect(() => {
+    const savedFontSize = localStorage.getItem('readFontSize');
+    const savedBackgroundColor = localStorage.getItem('readBackgroundColor');
+    const savedTextColor = localStorage.getItem('readTextColor');
+    
+    if (savedFontSize) {
+      const parsed = parseInt(savedFontSize, 10);
+      if (!isNaN(parsed) && parsed !== 18) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setFontSize(parsed);
+      }
+    }
+    
+    if (savedBackgroundColor && savedBackgroundColor !== '#fef9e7') {
+      setBackgroundColor(savedBackgroundColor);
+    }
+    
+    if (savedTextColor && savedTextColor !== '#27272a') {
+      setTextColor(savedTextColor);
+    }
+  }, []);
 
   // Detect scroll direction để ẩn/hiện footer
   useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      const scrollDifference = currentScrollY - lastScrollY;
-      const isNearBottom = window.innerHeight + currentScrollY >= document.documentElement.scrollHeight - 100;
-      
-      // Always show footer when near bottom or at top
-      if (isNearBottom || currentScrollY < 50) {
-        setShowFooter(true);
-      } else if (scrollDifference > 5 && currentScrollY > 100) {
-        // Scrolling down significantly
-        setShowFooter(false);
-      } else if (scrollDifference < -5) {
-        // Scrolling up significantly
-        setShowFooter(true);
-      }
-      
-      setLastScrollY(currentScrollY);
-    };
-
-    // Initial check
-    handleScroll();
+    // Tìm main element (scroll container từ layout)
+    const mainElement = document.querySelector('main');
+    if (!mainElement) return;
     
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [lastScrollY]);
+    // Khởi tạo giá trị ban đầu
+    lastScrollYRef.current = mainElement.scrollTop;
+    
+    let ticking = false;
+    
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = mainElement.scrollTop;
+          const scrollDifference = currentScrollY - lastScrollYRef.current;
+          
+          // Scroll xuống thì ẩn, scroll lên thì hiện
+          if (scrollDifference > 5) {
+            // Scrolling down - hide footer
+            setShowFooter(false);
+          } else if (scrollDifference < -5) {
+            // Scrolling up - show footer
+            setShowFooter(true);
+          }
+          
+          lastScrollYRef.current = currentScrollY;
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+    
+    mainElement.addEventListener('scroll', handleScroll, { passive: true });
+    return () => mainElement.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Save settings to localStorage
   const saveFontSize = (size: number) => {
@@ -132,6 +149,7 @@ export default function ReadChapterClient({
   const navigateChapter = (targetChapterNumber: number) => {
     router.push(`/read/${storyId}/${targetChapterNumber}`);
   };
+
 
   return (
     <div className="min-h-screen" style={{ backgroundColor }}>
@@ -358,8 +376,86 @@ export default function ReadChapterClient({
           backdropFilter: 'blur(16px)',
         }}
       >
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+        {/* Mobile: 2 icon buttons + dropdown */}
+        <div className="sm:hidden px-3 py-3">
+          <div className="flex items-center gap-2">
+            {/* Previous Chapter Button - Mobile (icon only) */}
+            <button
+              onClick={() => prevChapter && navigateChapter(prevChapter.chapterNumber)}
+              disabled={!prevChapter}
+              className="flex items-center justify-center w-10 h-10 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95] shadow-sm"
+              style={{ 
+                backgroundColor: `${textColor}18`,
+                color: textColor,
+                border: `1.5px solid ${textColor}25`,
+              }}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+
+            {/* Chapter Selector - Mobile */}
+            <div className="flex-1 relative min-w-0">
+              <div className="relative">
+                <select
+                  value={chapter.chapterNumber}
+                  onChange={(e) => navigateChapter(parseInt(e.target.value, 10))}
+                  className="w-full px-3 py-2.5 pr-10 rounded-xl text-sm font-medium appearance-none cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 shadow-sm"
+                  style={{ 
+                    backgroundColor: `${textColor}20`,
+                    color: textColor,
+                    border: `2px solid ${textColor}30`,
+                  }}
+                >
+                  {allChapters && allChapters.length > 0 ? (
+                    allChapters.map((ch) => (
+                      <option 
+                        key={ch.chapterNumber} 
+                        value={ch.chapterNumber}
+                        style={{
+                          backgroundColor: backgroundColor,
+                          color: textColor,
+                        }}
+                      >
+                        {ch.title ? `${ch.title}` : ''}
+                      </option>
+                    ))
+                  ) : (
+                    <option value={chapter.chapterNumber}>
+                      Chương {chapter.chapterNumber}
+                    </option>
+                  )}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className="w-4 h-4" style={{ color: textColor }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Next Chapter Button - Mobile (icon only) */}
+            <button
+              onClick={() => nextChapter && navigateChapter(nextChapter.chapterNumber)}
+              disabled={!nextChapter}
+              className="flex items-center justify-center w-10 h-10 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95] shadow-sm"
+              style={{ 
+                backgroundColor: `${textColor}18`,
+                color: textColor,
+                border: `1.5px solid ${textColor}25`,
+              }}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Desktop: Full layout with dropdown */}
+        <div className="hidden sm:block max-w-5xl mx-auto px-4 sm:px-6 py-5">
+          <div className="flex flex-row items-center gap-3 sm:gap-4">
             {/* Previous Chapter Button */}
             <button
               onClick={() => prevChapter && navigateChapter(prevChapter.chapterNumber)}
@@ -380,7 +476,7 @@ export default function ReadChapterClient({
               )}
             </button>
 
-            {/* Chapter Selector */}
+            {/* Chapter Selector - Desktop only */}
             <div className="flex-1 relative min-w-0">
               <div className="relative">
                 <select
