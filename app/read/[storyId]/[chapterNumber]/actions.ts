@@ -1,6 +1,6 @@
 'use server';
 
-import { getChapterByNumber, getStoryById, getChaptersByStoryId } from '@/lib/models';
+import { getChapterByNumber, getStoryById, getAllTranslatedChapters } from '@/lib/models';
 
 export async function getChapterData(storyId: string, chapterNumber: number) {
   try {
@@ -64,15 +64,14 @@ export async function getStoryData(storyId: string) {
 
 export async function getTranslatedChaptersList(storyId: string) {
   try {
-    const chapters = await getChaptersByStoryId(storyId);
+    // Lấy tất cả chương đã dịch (không giới hạn số lượng)
+    const chapters = await getAllTranslatedChapters(storyId);
     
-    // Chỉ lấy các chương đã dịch
-    const translatedChapters = chapters.chapters.filter(ch => ch.translatedContent && ch.status === 'completed')
-      .map(ch => ({
-        chapterNumber: ch.chapterNumber,
-        title: ch.title,
-      }))
-      .sort((a, b) => a.chapterNumber - b.chapterNumber);
+    // Map sang format cần thiết
+    const translatedChapters = chapters.map(ch => ({
+      chapterNumber: ch.chapterNumber,
+      title: ch.title,
+    }));
 
     return {
       success: true,

@@ -77,7 +77,7 @@ export default function ReadChapterClient({
   });
   
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [showFooter, setShowFooter] = useState(false);
+  const [showFooter, setShowFooter] = useState(true); // Show by default
   const [lastScrollY, setLastScrollY] = useState(0);
   const lineHeight = 1.8;
 
@@ -85,20 +85,26 @@ export default function ReadChapterClient({
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
+      const scrollDifference = currentScrollY - lastScrollY;
+      const isNearBottom = window.innerHeight + currentScrollY >= document.documentElement.scrollHeight - 100;
       
-      // Nếu scroll xuống (scrollY tăng) thì ẩn footer
-      // Nếu scroll lên (scrollY giảm) thì hiện footer
-      if (currentScrollY > lastScrollY && currentScrollY > 100) {
-        // Scrolling down
+      // Always show footer when near bottom or at top
+      if (isNearBottom || currentScrollY < 50) {
+        setShowFooter(true);
+      } else if (scrollDifference > 5 && currentScrollY > 100) {
+        // Scrolling down significantly
         setShowFooter(false);
-      } else if (currentScrollY < lastScrollY) {
-        // Scrolling up
+      } else if (scrollDifference < -5) {
+        // Scrolling up significantly
         setShowFooter(true);
       }
       
       setLastScrollY(currentScrollY);
     };
 
+    // Initial check
+    handleScroll();
+    
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, [lastScrollY]);
@@ -343,53 +349,95 @@ export default function ReadChapterClient({
 
       {/* Navigation Footer */}
       <div 
-        className={`fixed bottom-0 left-0 right-0 backdrop-blur-md border-t shadow-lg transition-transform duration-300 ${
+        className={`fixed bottom-0 left-0 right-0 z-40 backdrop-blur-md border-t shadow-2xl transition-transform duration-300 ease-in-out ${
           showFooter ? 'translate-y-0' : 'translate-y-full'
         }`}
         style={{ 
-          backgroundColor: `${backgroundColor}dd`,
-          borderColor: `${textColor}20`
+          backgroundColor: `${backgroundColor}f5`,
+          borderColor: `${textColor}25`,
+          backdropFilter: 'blur(16px)',
         }}
       >
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex justify-between items-center gap-4">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+            {/* Previous Chapter Button */}
             <button
               onClick={() => prevChapter && navigateChapter(prevChapter.chapterNumber)}
               disabled={!prevChapter}
-              className="px-4 py-2 rounded-lg font-medium transition-opacity disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-70"
+              className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98] shadow-md hover:shadow-lg"
               style={{ 
-                backgroundColor: `${textColor}15`,
-                color: textColor 
-              }}
-            >
-              ←
-            </button>
-            <select
-              value={chapter.chapterNumber}
-              onChange={(e) => navigateChapter(parseInt(e.target.value, 10))}
-              className="px-4 py-3 rounded-lg text-sm border"
-              style={{ 
-                backgroundColor: `${textColor}10`,
+                backgroundColor: `${textColor}18`,
                 color: textColor,
-                borderColor: `${textColor}30`
+                border: `1.5px solid ${textColor}25`,
               }}
             >
-              {allChapters.map((ch) => (
-                <option key={ch.chapterNumber} value={ch.chapterNumber}>
-                  Chương {ch.chapterNumber}
-                </option>
-              ))}
-            </select>
+              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+              </svg>
+              <span className="text-sm whitespace-nowrap">Chương trước</span>
+              {prevChapter && (
+                <span className="text-xs opacity-70 font-normal">({prevChapter.chapterNumber})</span>
+              )}
+            </button>
+
+            {/* Chapter Selector */}
+            <div className="flex-1 relative min-w-0">
+              <div className="relative">
+                <select
+                  value={chapter.chapterNumber}
+                  onChange={(e) => navigateChapter(parseInt(e.target.value, 10))}
+                  className="w-full px-4 py-3.5 pr-12 rounded-2xl text-base font-medium appearance-none cursor-pointer transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 shadow-sm"
+                  style={{ 
+                    backgroundColor: `${textColor}20`,
+                    color: textColor,
+                    border: `2px solid ${textColor}30`,
+                  }}
+                >
+                  {allChapters && allChapters.length > 0 ? (
+                    allChapters.map((ch) => (
+                      <option 
+                        key={ch.chapterNumber} 
+                        value={ch.chapterNumber}
+                        style={{
+                          backgroundColor: backgroundColor,
+                          color: textColor,
+                        }}
+                      >
+                        {ch.title ? `${ch.title}` : ''}
+                      </option>
+                    ))
+                  ) : (
+                    <option value={chapter.chapterNumber}>
+                      Chương {chapter.chapterNumber}
+                    </option>
+                  )}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                  <svg className="w-5 h-5" style={{ color: textColor }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Next Chapter Button */}
             <button
               onClick={() => nextChapter && navigateChapter(nextChapter.chapterNumber)}
               disabled={!nextChapter}
-              className="px-4 py-2 rounded-lg font-medium transition-opacity disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-70"
+              className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98] shadow-md hover:shadow-lg"
               style={{ 
-                backgroundColor: `${textColor}15`,
-                color: textColor 
+                backgroundColor: `${textColor}18`,
+                color: textColor,
+                border: `1.5px solid ${textColor}25`,
               }}
             >
-              →
+              <span className="text-sm whitespace-nowrap">Chương sau</span>
+              {nextChapter && (
+                <span className="text-xs opacity-70 font-normal">({nextChapter.chapterNumber})</span>
+              )}
+              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+              </svg>
             </button>
           </div>
         </div>

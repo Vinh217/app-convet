@@ -212,6 +212,25 @@ export async function getChaptersFrom(
   };
 }
 
+// Lấy tất cả chương đã dịch (không phân trang)
+export async function getAllTranslatedChapters(storyId: string) {
+  const client = await clientPromise;
+  const db = client.db();
+
+  const query: any = {
+    storyId,
+    status: 'completed',
+    translatedContent: { $exists: true, $ne: '' },
+  };
+
+  const chapters = await db.collection<Chapter>('chapters')
+    .find(query)
+    .sort({ chapterNumber: 1 })
+    .toArray();
+
+  return chapters;
+}
+
 export async function getChapterById(id: string) {
   const client = await clientPromise;
   const db = client.db();
