@@ -28,7 +28,7 @@ export default async function StoryDetailPage({ params, searchParams }: PageProp
   const { storyId } = await params;
   const { page } = await searchParams;
   const currentPage = Number(page) || 1;
-  const limit = 50;
+  const limit = 100;
   
   const [story, chaptersData, latestChapter] = await Promise.all([
     getStoryById(storyId),

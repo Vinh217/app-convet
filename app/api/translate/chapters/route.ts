@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
 
     const storyId = searchParams.get('storyId');
     const page = parseInt(searchParams.get('page') || '1', 10) || 1;
-    const limit = parseInt(searchParams.get('limit') || '50', 10) || 50;
+    const limit = parseInt(searchParams.get('limit') || '100', 10) || 100;
     const status = searchParams.get('status') || undefined;
     const search = searchParams.get('search') || '';
 

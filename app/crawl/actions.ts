@@ -1,10 +1,10 @@
 'use server';
 
+import { getStories } from '@/lib/models';
 import { 
-  getStories, 
   getChaptersByStoryId, 
   getChaptersByRange as getChaptersByRangeModel,
-  getChaptersByNumbers,
+  getChaptersByNumbers as getChaptersByNumbersModel,
   getChaptersFrom as getChaptersFromModel
 } from '@/lib/models';
 
@@ -12,55 +12,22 @@ export async function getStoriesList() {
   try {
     const stories = await getStories();
     return {
-      success: true,
-      data: stories.map(story => ({
+      success: true as const,
+      data: stories.map((story) => ({
         _id: story._id?.toString() || '',
         title: story.title,
-        totalChapters: story.totalChapters,
       })),
     };
   } catch (error) {
     console.error('Error fetching stories:', error);
     return {
-      success: false,
+      success: false as const,
       error: 'Failed to fetch stories',
       data: [],
     };
   }
 }
 
-export async function getChaptersList(storyId: string) {
-  try {
-    // Giữ lại API cũ cho backward-compat (nếu nơi khác đang dùng)
-    const result = await getChaptersByStoryId(storyId, {
-      page: 1,
-      limit: 100,
-    });
-
-    const chapters = result.chapters.map((ch) => ({
-      _id: ch._id?.toString() || '',
-      chapterNumber: ch.chapterNumber,
-      title: ch.title,
-      originalContent: ch.originalContent,
-      translatedContent: ch.translatedContent,
-      status: ch.status,
-    }));
-
-    return {
-      success: true,
-      data: chapters,
-    };
-  } catch (error) {
-    console.error('Error fetching chapters:', error);
-    return {
-      success: false,
-      error: 'Failed to fetch chapters',
-      data: [],
-    };
-  }
-}
-
-// New paginated + searchable fetch for translate page
 export interface PaginatedChaptersParams {
   storyId: string;
   page?: number;
@@ -73,13 +40,48 @@ export async function getChaptersPaginated(params: PaginatedChaptersParams) {
   const { storyId, page = 1, limit = 50, status, search } = params;
 
   try {
-    // Search is now handled at MongoDB level in getChaptersByStoryId
-    const result = await getChaptersByStoryId(storyId, {
-      page,
-      limit,
-      status,
-      search, // Pass search to backend
-    });
+    // Parse search query for smart search patterns
+    const rangeMatch = search?.match(/^(\d+)\s*-\s*(\d+)$/);
+    const listMatch = search?.match(/^(\d+(?:\s*,\s*\d+)+)$/);
+    const fromMatch = search?.match(/^(\d+)\s*\+$/);
+
+    let result;
+
+    if (rangeMatch) {
+      // Range search
+      const from = parseInt(rangeMatch[1], 10);
+      const to = parseInt(rangeMatch[2], 10);
+      const rangeResult = await getChaptersByRangeModel(storyId, { from, to, status });
+      result = {
+        chapters: rangeResult.chapters,
+        total: rangeResult.count,
+        totalPages: 1,
+        currentPage: 1,
+      };
+    } else if (listMatch) {
+      // List search
+      const numbers = search.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n) && n > 0);
+      const listResult = await getChaptersByNumbersModel(storyId, { numbers, status });
+      result = {
+        chapters: listResult.chapters,
+        total: listResult.count,
+        totalPages: 1,
+        currentPage: 1,
+      };
+    } else if (fromMatch) {
+      // From onwards search
+      const from = parseInt(fromMatch[1], 10);
+      const fromResult = await getChaptersFromModel(storyId, { from, status });
+      result = {
+        chapters: fromResult.chapters,
+        total: fromResult.count,
+        totalPages: 1,
+        currentPage: 1,
+      };
+    } else {
+      // Normal paginated search
+      result = await getChaptersByStoryId(storyId, { page, limit, status, search });
+    }
 
     return {
       success: true as const,
@@ -89,15 +91,15 @@ export async function getChaptersPaginated(params: PaginatedChaptersParams) {
           chapterNumber: ch.chapterNumber,
           title: ch.title,
           originalContent: ch.originalContent,
-          translatedContent: ch.translatedContent,
+          url: ch.url,
           status: ch.status,
         })),
         pagination: {
-          page: result.currentPage,
+          page: result.currentPage || 1,
           limit,
-          total: result.total, // This now reflects the filtered total
-          totalPages: result.totalPages,
-          hasMore: result.currentPage < result.totalPages,
+          total: result.total,
+          totalPages: result.totalPages || 1,
+          hasMore: (result.currentPage || 1) < (result.totalPages || 1),
         },
       },
     };
@@ -132,7 +134,7 @@ export async function getChaptersByRange(params: RangeChaptersParams) {
           chapterNumber: ch.chapterNumber,
           title: ch.title,
           originalContent: ch.originalContent,
-          translatedContent: ch.translatedContent,
+          url: ch.url,
           status: ch.status,
         })),
         count: result.count,
@@ -154,11 +156,11 @@ export interface ListChaptersParams {
   status?: string;
 }
 
-export async function getChaptersByList(params: ListChaptersParams) {
+export async function getChaptersByNumbers(params: ListChaptersParams) {
   const { storyId, numbers, status } = params;
 
   try {
-    const result = await getChaptersByNumbers(storyId, { numbers, status });
+    const result = await getChaptersByNumbersModel(storyId, { numbers, status });
 
     return {
       success: true as const,
@@ -168,7 +170,7 @@ export async function getChaptersByList(params: ListChaptersParams) {
           chapterNumber: ch.chapterNumber,
           title: ch.title,
           originalContent: ch.originalContent,
-          translatedContent: ch.translatedContent,
+          url: ch.url,
           status: ch.status,
         })),
         count: result.count,
@@ -204,7 +206,7 @@ export async function getChaptersFrom(params: FromChaptersParams) {
           chapterNumber: ch.chapterNumber,
           title: ch.title,
           originalContent: ch.originalContent,
-          translatedContent: ch.translatedContent,
+          url: ch.url,
           status: ch.status,
         })),
         count: result.count,
@@ -219,5 +221,4 @@ export async function getChaptersFrom(params: FromChaptersParams) {
     };
   }
 }
-
 

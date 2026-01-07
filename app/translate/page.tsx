@@ -15,7 +15,7 @@ export default async function TranslatePage(props: TranslatePageProps) {
   const [storiesResult, chaptersResult] = await Promise.all([
     getStoriesList(),
     storyId
-      ? getChaptersPaginated({ storyId, page: 1, limit: 50 })
+      ? getChaptersPaginated({ storyId, page: 1, limit: 100 })
       : Promise.resolve({ success: true, data: null }),
   ]);
 

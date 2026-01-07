@@ -28,8 +28,9 @@ export const websitePresets: WebsitePreset[] = [
     name: 'Metruyenchu.com.vn',
     domain: 'metruyenchu.com.vn',
     chapterSelectors: {
-      titleSelector: 'h1.text-2xl.font-bold, h1.font-bold, .chapter-title, h1',
-      contentSelector: 'div#chapter-content p, .chapter-content p, div[class*="chapter-content"] p',
+      // h1 = story title, h2 = chapter title, div.truyen = chapter content
+      titleSelector: 'h2',
+      contentSelector: 'div.truyen',
       nextSelector: 'a[title*="tiếp"], a:contains("Chương tiếp"), .next-chapter a',
     },
     listSelectors: {

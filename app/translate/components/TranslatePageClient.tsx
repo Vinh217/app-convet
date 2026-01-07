@@ -154,7 +154,7 @@ export default function TranslatePageClient({
       const result = await getChaptersPaginated({
         storyId: selectedStoryId,
         page: targetPage,
-        limit: 50,
+        limit: 100,
         status: effectiveStatus,
         search: parsed.type === 'normal' ? parsed.originalQuery : undefined,
       });

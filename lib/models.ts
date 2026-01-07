@@ -76,7 +76,7 @@ export async function getChaptersByStoryId(
   const client = await clientPromise;
   const db = client.db();
   
-  const { page = 1, limit = 50, status, search } = options;
+  const { page = 1, limit = 100, status, search } = options;
   const skip = (page - 1) * limit;
 
   const query: any = { storyId };
@@ -311,6 +311,31 @@ export async function getLatestChapter(storyId: string) {
     .limit(1)
     .toArray();
   return chapters[0];
+}
+
+export async function getChapterByUrl(storyId: string, url: string) {
+  const client = await clientPromise;
+  const db = client.db();
+  return db.collection<Chapter>('chapters').findOne({ 
+    storyId,
+    url
+  });
+}
+
+export async function getChaptersWithoutContent(storyId: string) {
+  const client = await clientPromise;
+  const db = client.db();
+  return db.collection<Chapter>('chapters')
+    .find({ 
+      storyId,
+      $or: [
+        { originalContent: { $exists: false } },
+        { originalContent: '' },
+        { originalContent: { $regex: /^\s*$/ } }
+      ]
+    })
+    .sort({ chapterNumber: 1 })
+    .toArray();
 }
 
 export interface StoryContext {

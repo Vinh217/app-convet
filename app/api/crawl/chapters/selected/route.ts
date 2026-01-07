@@ -1,32 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getChapterById, updateChapter, getChaptersByStoryId } from '@/lib/models';
+import { getChapterById, updateChapter } from '@/lib/models';
 import { crawlChapter } from '@/lib/crawler';
 import { getPresetByUrl } from '@/lib/website-presets';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { chapterId, chapterIds, selectors } = body;
+    const { chapterIds, selectors } = body;
 
-    // Support both single and batch crawl
-    const ids = chapterIds || (chapterId ? [chapterId] : []);
-
-    if (ids.length === 0) {
+    if (!chapterIds || !Array.isArray(chapterIds) || chapterIds.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'Chapter ID or chapter IDs are required' },
+        { success: false, error: 'Chapter IDs array is required' },
         { status: 400 }
       );
     }
 
     const results = [];
+    let preset: ReturnType<typeof getPresetByUrl> | null = null;
 
-    for (const id of ids) {
+    for (const chapterId of chapterIds) {
       try {
         // Get chapter from DB
-        const chapter = await getChapterById(id);
+        const chapter = await getChapterById(chapterId);
         if (!chapter) {
           results.push({
-            chapterId: id,
+            chapterId,
             status: 'failed',
             error: 'Chapter not found',
           });
@@ -36,24 +34,27 @@ export async function POST(request: NextRequest) {
         // Skip if already has content
         if (chapter.originalContent && chapter.originalContent.trim() !== '') {
           results.push({
-            chapterId: id,
+            chapterId,
             status: 'skipped',
             message: 'Chapter already has content',
           });
           continue;
         }
 
-        // Get selectors from preset or use provided selectors
+        // Get selectors from preset (cache it for same domain)
         let finalSelectors = selectors;
         if (!finalSelectors) {
-          const preset = getPresetByUrl(chapter.url);
+          if (!preset) {
+            preset = getPresetByUrl(chapter.url);
+          }
           if (preset) {
             finalSelectors = preset.chapterSelectors;
           } else {
             // Fallback to metruyenchu hardcoded selectors
+            // h1 = story title, h2 = chapter title, div.truyen = chapter content
             finalSelectors = {
-              titleSelector: 'h1.current-book, h2.current-chapter',
-              contentSelector: 'div.truyen p',
+              titleSelector: 'h2',
+              contentSelector: 'div.truyen',
             };
           }
         }
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
 
         if (!crawlResult.content || crawlResult.content.trim() === '') {
           results.push({
-            chapterId: id,
+            chapterId,
             status: 'failed',
             error: 'Không tìm thấy nội dung chương',
           });
@@ -71,7 +72,11 @@ export async function POST(request: NextRequest) {
         }
 
         // Update chapter
-        const updateData: any = {
+        const updateData: {
+          originalContent: string;
+          status: 'failed' | 'pending' | 'translating' | 'completed';
+          title?: string;
+        } = {
           originalContent: crawlResult.content,
           status: 'pending',
         };
@@ -81,22 +86,23 @@ export async function POST(request: NextRequest) {
           updateData.title = crawlResult.title;
         }
 
-        await updateChapter(id, updateData);
+        await updateChapter(chapterId, updateData);
 
         results.push({
-          chapterId: id,
+          chapterId,
           status: 'success',
           contentLength: crawlResult.content.length,
           title: crawlResult.title || chapter.title,
+          chapterNumber: chapter.chapterNumber,
         });
 
-        // Small delay between requests
-        if (ids.length > 1 && id !== ids[ids.length - 1]) {
+        // Small delay between requests to avoid rate limiting
+        if (chapterId !== chapterIds[chapterIds.length - 1]) {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
       } catch (error) {
         results.push({
-          chapterId: id,
+          chapterId,
           status: 'failed',
           error: error instanceof Error ? error.message : 'Unknown error',
         });
@@ -120,11 +126,11 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error crawling chapter:', error);
+    console.error('Error crawling selected chapters:', error);
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to crawl chapter',
+        error: error instanceof Error ? error.message : 'Failed to crawl selected chapters',
       },
       { status: 500 }
     );
