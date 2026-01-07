@@ -34,7 +34,7 @@ export async function GET(
       };
     } else if (listMatch) {
       // List search
-      const numbers = search.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n) && n > 0);
+      const numbers = search?.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n) && n > 0) || [];
       const listResult = await getChaptersByNumbers(id, { numbers, status });
       result = {
         chapters: listResult.chapters,

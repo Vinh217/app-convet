@@ -60,7 +60,7 @@ export async function getChaptersPaginated(params: PaginatedChaptersParams) {
       };
     } else if (listMatch) {
       // List search
-      const numbers = search.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n) && n > 0);
+      const numbers = search?.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n) && n > 0) || [];
       const listResult = await getChaptersByNumbersModel(storyId, { numbers, status });
       result = {
         chapters: listResult.chapters,
