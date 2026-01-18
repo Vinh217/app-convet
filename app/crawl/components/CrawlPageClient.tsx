@@ -208,11 +208,12 @@ export default function CrawlPageClient({
       const data = await response.json();
 
       if (data.success) {
-        const successCount = data.data.summary.success;
-        alert(`Đã crawl ${successCount}/${selectedChapters.length} chương thành công!`);
+        alert(`${data.data.message}\n\nBạn có thể đóng trang này. Quá trình crawl sẽ chạy trong background.`);
         setSelectedChapters([]);
-        // Refresh page to get updated data from server
-        router.refresh();
+        // Set a timer to refresh after a delay to show updated results
+        setTimeout(() => {
+          router.refresh();
+        }, 5000);
       } else {
         alert(`Lỗi: ${data.error}`);
       }
@@ -258,10 +259,11 @@ export default function CrawlPageClient({
       const data = await response.json();
 
       if (data.success) {
-        const successCount = data.data.summary.success;
-        alert(`Đã crawl ${successCount}/${pendingChapters.length} chương thành công!`);
-        // Refresh page to get updated data from server
-        router.refresh();
+        alert(`${data.data.message}\n\nBạn có thể đóng trang này. Quá trình crawl sẽ chạy trong background.`);
+        // Set a timer to refresh after a delay to show updated results
+        setTimeout(() => {
+          router.refresh();
+        }, 5000);
       } else {
         alert(`Lỗi: ${data.error}`);
       }
